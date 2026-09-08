@@ -51,7 +51,10 @@ DECODERS="mpeg4,msmpeg4v1,msmpeg4v2,msmpeg4v3,h263,h263i"
 DECODERS="${DECODERS},mpeg1video,mpeg2video,wmv1,wmv2,wmv3,vc1,flv"
 DECODERS="${DECODERS},cinepak,indeo2,indeo3,indeo4,indeo5,msvideo1,msrle"
 DECODERS="${DECODERS},rawvideo,mjpeg,mjpegb,svq1,svq3,rpza,qtrle,smc,qdraw"
-DECODERS="${DECODERS},qpeg,tscc,truemotion1,truemotion2,dvvideo,theora"
+# tscc is absent on purpose and not by oversight: its decoder inflates with
+# zlib, and --disable-zlib below is what keeps this artifact free of a second
+# vendored library. A TSCC clip is a screen capture, not a cinematic.
+DECODERS="${DECODERS},qpeg,truemotion1,truemotion2,dvvideo,theora"
 DECODERS="${DECODERS},vp3,vp5,vp6,vp6a,vp6f"
 DECODERS="${DECODERS},bink,smacker,vmdvideo,flic,roq,idcin,interplay_video"
 DECODERS="${DECODERS},mdec,fourxm"
