@@ -90,20 +90,23 @@ if [ ! -f "${INSTALL_DIR}/lib/libavcodec.a" ]; then
         --cxx=em++ \
         --ar=emar \
         --ranlib=emranlib \
-        --nm=llvm-nm \
+        --nm="${EMSDK}/upstream/bin/llvm-nm" \
         --extra-cflags="-O2"
 
-    # The silence above is the whole reason for this: config.h is the only place
-    # that says what configure actually accepted, so every requested name is
-    # asserted against it and a name that stopped existing fails the build here
-    # rather than at the first file a game tries to play.
+    # The silence above is the whole reason for this: the generated headers are
+    # the only place that say what configure actually accepted, so every
+    # requested name is asserted against them and a name that stopped existing
+    # fails the build here rather than at the first file a game tries to play.
+    # Components live in config_components.h, not config.h -- reading only the
+    # latter finds nothing and looks exactly like a build with no codecs in it.
+    cat config.h config_components.h > "${WORK}/enabled.h"
     missing=""
     for group in "DEMUXER:${DEMUXERS}" "DECODER:${DECODERS}" \
                  "PARSER:${PARSERS}" "BSF:${BSFS}"; do
         kind="${group%%:*}"
         for name in $(printf '%s' "${group#*:}" | tr ',' ' '); do
             macro="CONFIG_$(printf '%s' "${name}" | tr '[:lower:]' '[:upper:]')_${kind}"
-            if ! grep -qE "^#define ${macro} 1$" config.h; then
+            if ! grep -qE "^#define ${macro} 1$" "${WORK}/enabled.h"; then
                 missing="${missing} ${kind}:${name}"
             fi
         done
