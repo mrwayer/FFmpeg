@@ -1,0 +1,73 @@
+# Copyright © 2026 Bottlify Project
+# Licensed under the Mozilla Public License, version 2.0
+# See https://mozilla.org/MPL/2.0/ for details
+#
+# Bottlify infrastructure (not an upstream candidate).
+#
+# It compiles FFmpeg to WebAssembly in a container, which costs the better part
+# of an hour of a runner to answer one question -- do the pinned inputs still
+# produce the artifact the consumer's lock names. That answer cannot change
+# unless this branch, the build definition or the base image moves, so this runs
+# when its own inputs change, on a monthly schedule that would catch the image
+# drifting, and on demand.
+#
+# It lives here rather than in the consuming repository for three reasons: a
+# long build that fails should not mail that project's owner about that project,
+# it should not spend that project's Actions minutes, and its artifacts should
+# not clutter that project's releases. What it publishes is what every
+# development machine there then consumes -- a fetch script downloads these
+# assets and verifies them against a lock. Nobody needs Emscripten locally, and
+# the .wasm never enters git.
+name: bottlify-video-decoder
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 1 * *'
+  push:
+    branches: [bottlify]
+    paths:
+      - 'bottlify/**'
+      - '.github/workflows/bottlify-video-decoder.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  decoder:
+    name: video-decoder (FFmpeg to wasm in a container)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: node bottlify/build.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-decoder
+          path: |
+            bottlify/out/video-decoder.wasm
+            bottlify/out/SHA256SUMS
+            bottlify/out/video-decoder.manifest.json
+
+      # The tag names the commit that produced the bytes, which is what the
+      # consumer then pins.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-$(git rev-parse --short HEAD)"
+          NOTES="FFmpeg (LGPL-2.1-or-later) compiled to WebAssembly by bottlify/, from $(git rev-parse HEAD)."
+          cd bottlify/out
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+              video-decoder.wasm SHA256SUMS video-decoder.manifest.json
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "video-decoder $TAG" --notes "$NOTES" \
+              video-decoder.wasm SHA256SUMS video-decoder.manifest.json
+          fi
